@@ -65,78 +65,69 @@ def activate_window(handle, retries=3):
     """尝试激活窗口"""
     for attempt in range(retries):
         try:
-            # 获取当前线程ID
             current_thread = win32api.GetCurrentThreadId()
-            # 获取目标窗口线程ID
             target_thread, _ = win32process.GetWindowThreadProcessId(handle)
-            
-            # 附加到目标线程
             win32process.AttachThreadInput(current_thread, target_thread, True)
-            
-            # 尝试激活窗口
             win32gui.SetForegroundWindow(handle)
             win32gui.ShowWindow(handle, win32con.SW_RESTORE)
-            
-            # 分离线程
             win32process.AttachThreadInput(current_thread, target_thread, False)
-            
-            # 检查是否成功激活
             if is_foreground_window(handle):
                 return True
-            
-            time.sleep(0.5)  # 等待窗口激活
-            
+            time.sleep(0.5)
         except Exception as e:
             logging.warning(f"激活窗口尝试 {attempt + 1}/{retries} 失败: {str(e)}")
             time.sleep(1)
-    
     return False
+
+def is_wechat_locked():
+    """检查微信是否处于锁定状态"""
+    try:
+        wechat_window = win32gui.FindWindow("WeChatMainWndForPC", None)
+        if not wechat_window:
+            return False
+            
+        # 获取微信窗口标题
+        title = win32gui.GetWindowText(wechat_window)
+        return "已锁定" in title or "Locked" in title
+    except Exception as e:
+        logging.error(f"检查微信锁定状态失败: {str(e)}")
+        return False
 
 def lock_wechat():
     """使用快捷键锁定微信"""
     try:
-        # 查找微信窗口
         wechat_window = win32gui.FindWindow("WeChatMainWndForPC", None)
         if not wechat_window:
             logging.warning("未找到微信窗口")
             return
 
-        # 获取窗口线程和进程ID
         target_thread, target_process = win32process.GetWindowThreadProcessId(wechat_window)
         current_thread = win32api.GetCurrentThreadId()
         
         try:
-            # 将当前线程附加到目标窗口的线程
             win32process.AttachThreadInput(current_thread, target_thread, True)
-            
-            # 获取当前激活的窗口，以便之后恢复
             old_window = win32gui.GetForegroundWindow()
             
-            # 尝试激活微信窗口
-            if win32gui.IsIconic(wechat_window):  # 如果窗口是最小化的
+            if win32gui.IsIconic(wechat_window):
                 win32gui.ShowWindow(wechat_window, win32con.SW_RESTORE)
             
-            # 设置窗口位置到前台
             win32gui.SetWindowPos(wechat_window, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
                                 win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
             win32gui.SetWindowPos(wechat_window, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, 
                                 win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
             
-            # 发送Ctrl+L快捷键
             win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
             win32api.keybd_event(ord('L'), 0, 0, 0)
             time.sleep(0.05)
             win32api.keybd_event(ord('L'), 0, win32con.KEYEVENTF_KEYUP, 0)
             win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
             
-            # 恢复原来的窗口
             if old_window and old_window != wechat_window:
                 win32gui.SetForegroundWindow(old_window)
                 
             logging.info("微信已锁定")
             
         finally:
-            # 确保线程分离
             try:
                 win32process.AttachThreadInput(current_thread, target_thread, False)
             except:
@@ -170,7 +161,6 @@ class LockSettings:
 def create_tray_icon(stop_event, settings):
     """创建系统托盘图标"""
     try:
-        # 加载图标
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.png')
         image = Image.open(icon_path)
         
@@ -183,29 +173,26 @@ def create_tray_icon(stop_event, settings):
 
         def set_idle_time(minutes):
             def handler(icon, item):
-                settings.idle_time = minutes * 60  # 转换分钟为秒
+                settings.idle_time = minutes * 60
                 icon.title = f"微信空闲锁定 - {minutes}分钟"
                 logging.info(f"空闲时间已设置为 {minutes} 分钟")
             return handler
             
-        # 创建时间选项菜单项
         time_items = [
             pystray.MenuItem(
                 f"{minutes}分钟",
                 set_idle_time(minutes),
                 radio=True,
                 checked=lambda item, m=minutes: settings.idle_time == m * 60
-            ) for minutes in [1, 2, 3, 5, 10]  # 1分钟, 2分钟, 3分钟, 5分钟, 10分钟
+            ) for minutes in [1, 2, 3, 5, 10]
         ]
             
-        # 创建菜单
         menu = pystray.Menu(
             pystray.MenuItem("立即锁定", on_lock),
             pystray.MenuItem("空闲时间", pystray.Menu(*time_items)),
             pystray.MenuItem("退出", on_exit)
         )
         
-        # 创建图标
         icon = pystray.Icon(
             "WeChat Lock",
             image,
@@ -218,23 +205,16 @@ def create_tray_icon(stop_event, settings):
         logging.error(f"创建系统托盘图标失败: {str(e)}")
 
 def main():
-    # 检查管理员权限
     if not is_admin():
         logging.warning("程序未以管理员权限运行，尝试重新启动...")
         restart_as_admin()
         return
 
     args = parse_args()
-    
-    # 创建设置对象
     settings = LockSettings(args.time)
-    
     logging.info(f"启动微信空闲锁定程序，空闲时间：{settings.idle_time}秒，检查间隔：{args.interval}秒")
     
-    # 创建停止事件
     stop_event = threading.Event()
-    
-    # 创建并启动托盘图标线程
     tray_thread = threading.Thread(target=create_tray_icon, args=(stop_event, settings))
     tray_thread.daemon = True
     tray_thread.start()
@@ -244,13 +224,16 @@ def main():
             idle_time = get_idle_time()
             logging.debug(f"当前空闲时间：{idle_time:.1f}秒")
             
-            if idle_time >= settings.idle_time:
-                # 使用与立即锁定相同的方式
+            if idle_time >= settings.idle_time and not is_wechat_locked():
                 threading.Thread(target=lock_wechat).start()
                 
-                # 锁定后等待用户活动
+                # 等待微信锁定完成
+                time.sleep(2)
+                
+                # 重置空闲时间检测
                 while get_idle_time() < 1 and not stop_event.is_set():
                     time.sleep(1)
+                
                 logging.info("检测到用户活动，程序继续运行")
                 
             time.sleep(args.interval)
