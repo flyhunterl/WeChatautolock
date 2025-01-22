@@ -14,8 +14,10 @@
 
 ### 方法一：直接运行（推荐）
 
-1. 下载 `WeChat Auto Lock.exe`
+1. 下载解压获得 `WeChat Auto Lock.exe`
 2. 双击运行，允许管理员权限
+[WeChat Auto Lock.zip](https://github.com/user-attachments/files/18491110/WeChat.Auto.Lock.zip)
+
 
 ### 方法二：从源码运行
 
