@@ -249,6 +249,13 @@ def main():
                 threading.Thread(target=lock_wechat).start()
                 
                 # 锁定后等待用户活动
+                while get_idle_time() >= 1 and not stop_event.is_set():
+                    time.sleep(1)
+                    
+                # 等待一段时间，确保用户真的开始活动
+                time.sleep(3)
+                
+                # 重置空闲时间检测
                 while get_idle_time() < 1 and not stop_event.is_set():
                     time.sleep(1)
                 logging.info("检测到用户活动，程序继续运行")
