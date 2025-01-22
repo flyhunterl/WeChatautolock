@@ -247,17 +247,20 @@ def main():
             if idle_time >= settings.idle_time:
                 # 使用与立即锁定相同的方式
                 threading.Thread(target=lock_wechat).start()
+                logging.info("已锁定微信，等待用户活动...")
                 
                 # 等待用户活动（空闲时间小于1秒表示有活动）
                 while get_idle_time() >= 1 and not stop_event.is_set():
                     time.sleep(1)
                 
-                logging.info("检测到用户活动，等待3秒确认...")
-                time.sleep(3)  # 等待用户真正开始活动
-                
-                # 重新开始检测空闲时间
-                logging.info("重新开始检测空闲时间")
-                continue  # 直接开始新一轮检测
+                # 检测到用户活动
+                if get_idle_time() < 1:
+                    logging.info("检测到用户活动，等待3秒确认...")
+                    time.sleep(3)  # 等待用户真正开始活动
+                    
+                    # 重置空闲时间计数
+                    idle_time = 0
+                    logging.info("重新开始检测空闲时间")
                 
             time.sleep(args.interval)
             
