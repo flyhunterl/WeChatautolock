@@ -15,7 +15,13 @@ def modify_main_script():
         content = f.read()
     
     # 在导入语句后添加图标数据
+    import_end = content.find('import threading')
+    if import_end == -1:
+        import_end = content.find('def is_admin')
+    
     icon_code = f'''
+import threading
+
 # 内置图标数据
 ICON_BASE64 = "{icon_base64}"
 
@@ -34,9 +40,11 @@ def get_icon_image():
         'image = get_icon_image()'
     )
     
+    # 插入图标代码到正确的位置
+    content = content[:import_end] + icon_code + content[import_end+len('import threading')+1:]
+    
     with open('system_inactivity_lock_temp.py', 'w', encoding='utf-8') as f:
         f.write(content)
-        f.write(icon_code)
 
 def build():
     # 修改主程序
