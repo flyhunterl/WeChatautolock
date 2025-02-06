@@ -1,7 +1,8 @@
 # WeChat Auto Lock
 
 一个自动锁定微信的小工具，当系统空闲指定时间后自动锁定微信窗口。
-
+该项目停止维护
+新项目https://github.com/flyhunterl/wechatguard
 ## 功能特点
 
 - 系统托盘运行，不占用任务栏
